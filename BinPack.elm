@@ -1,13 +1,75 @@
-module BinPack exposing (..)
+module BinPack exposing
 
+    ( BinPack
+    , container
+    , pack, forcePack
+    , find
+    , fold, foldGeometry
+    , toList, fromList
+    , map
+    )
 
-import Random
+{-| Simple bin packing for rectangles.
+
+Based on [the version in Haskell](https://github.com/bflyblue/binpack/blob/master/Data/BinPack/R2.hs).
+
+[The demo of a similar algorithm](https://observablehq.com/@mourner/simple-rectangle-packing).
+
+[The article on how it works](https://codeincomplete.com/articles/bin-packing/).
+
+Create one with `container <width> <height>` and then add rectangles and values using `pack` or `forcePack`:
+
+    -- :: BinPack Color
+    BinPack.container 300 250
+        |> pack ( { width = 10, height = 30 }, Color.black )
+        |> pack ( { width = 20, height = 15 }, Color.red )
+        |> pack ( { width = 5, height = 25 }, Color.blue )
+        |> ...
+
+    -- :: BinPack String
+    BinPack.container 300 250
+        |> pack ( { width = 10, height = 30 }, "Martha" )
+        |> pack ( { width = 20, height = 15 }, "Ben" )
+        |> pack ( { width = 5, height = 25 }, "John" )
+        |> ...
+
+# Core type
+
+@docs BinPack
+
+# Create container or node
+
+Usually you don't need creating nodes manually, prefer creating an empty container and filling it with cells using `pack`.
+
+@docs container, node
+
+# Packing
+
+@docs pack, forcePack
+
+# Search
+
+@docs find
+
+# Folding
+
+@docs fold, foldGeometry
+
+# Lists
+
+@docs toList
+
+# Mapping
+
+@docs map
+
+-}
+
 import Bounds exposing (Bounds)
 
 
-{- Based on: https://github.com/bflyblue/binpack/blob/master/Data/BinPack/R2.hs -}
-
-
+{-| `BinPack a`, where `a` is the type of what every rectangle is associated with (what lies in every cell). For example, it could be `Color`.
+-}
 type BinPack a
     = Node
 
@@ -28,6 +90,7 @@ type BinPack a
         }
 
 
+{-| Substitute all of the cells with different ones, using the previous ones as the source. -}
 map : ( a -> b ) -> BinPack a -> BinPack b
 map f bp =
     case bp of
@@ -40,6 +103,17 @@ map f bp =
         Free size -> Free size
 
 
+{-| Fold the `BinPack a` to any other type, for example:
+
+    BinPack.container 300 250
+        |> pack ( { width = 10, height = 30 }, Color.black )
+        |> pack ( { width = 20, height = 15 }, Color.red )
+        |> pack ( { width = 5, height = 25 }, Color.blue )
+        |> fold (::) []
+
+    -- == [ Color.black, Color.red, Color.blue ]
+
+ -}
 fold : ( a -> b -> b ) -> b -> BinPack a -> b
 fold f =
     fold1
@@ -50,6 +124,8 @@ fold f =
         )
 
 
+{-| Fold the `BinPack` using the information about if it's a free space or a node.
+ -}
 fold1 : ( BinPack a -> b -> b ) -> b -> BinPack a -> b
 fold1 f i bp =
     case bp of
@@ -62,8 +138,24 @@ fold1 f i bp =
         Free _ -> f bp i
 
 
-unfold : ( ( a, Bounds ) -> k -> k ) -> k -> BinPack a -> k
-unfold f =
+{-| Fold the structure, using both the values and their bounds:
+
+    BinPack.container 20 100
+        |> pack ( { width = 10, height = 30 }, Color.black )
+        |> pack ( { width = 20, height = 15 }, Color.red )
+        |> pack ( { width = 5, height = 25 }, Color.blue )
+        |> pack ( { width = 12, height = 25 }, Color.green )
+        |> foldByBounds (::) []
+
+    ==
+        [ ( Color.black, { x = 0, y = 0, width = 10, height = 30 } )
+        , ( Color.red, { x = 0, y = 30, width = 20, height = 15 } )
+        , ( Color.blue, { x = 10, y = 0, width = 5, height = 25 } )
+        , ( Color.green, { x = 0, y = 45, width = 12, height = 25 } )
+        ]
+ -}
+foldGeometry : ( ( a, Bounds ) -> k -> k ) -> k -> BinPack a -> k
+foldGeometry f =
     let
         helper x y v bp =
            case bp of
@@ -79,8 +171,10 @@ unfold f =
     in helper 0 0
 
 
-unfold1 : ( ( BinPack a, Bounds ) -> k -> k ) -> k -> BinPack a -> k
-unfold1 f =
+{-| Fold with the information if it's a free space or a node, including bounds.
+ -}
+foldGeometry1 : ( ( BinPack a, Bounds ) -> k -> k ) -> k -> BinPack a -> k
+foldGeometry1 f =
     let
         helper x y v bp =
            case bp of
@@ -103,17 +197,27 @@ unfold1 f =
     in helper 0 0
 
 
-unpack : BinPack a -> List (a, Bounds)
-unpack = unfold (::) []
+{-| Convert the structure to the list of values and their bounds
+-}
+toList : BinPack a -> List (a, Bounds)
+toList = foldGeometry (::) []
 
 
-unpack1 : BinPack a -> List (BinPack a, Bounds)
-unpack1 = unfold1 (::) []
+{-| Convert the structure to the list of values and their bounds + information if it's a free space or a node.
+-}
+toList1 : BinPack a -> List (BinPack a, Bounds)
+toList1 = foldGeometry1 (::) []
 
 
+{-| Create an empty container with given height and width.
+-}
+container : Float -> Float -> BinPack a
 container w h = Free { width = w, height = h }
 
 
+{-| Create a node with given width, height, value, and other packs below and right
+-}
+node : Float -> Float -> BinPack a -> BinPack a -> a -> BinPack a
 node w h r b a =
     Node
         { width = w
@@ -124,10 +228,11 @@ node w h r b a =
         }
         a
 
-
+{-| Try to pack the value in a rectangle with given width and height. If the rect doesn't fit, `Nothing` is returned.
+-}
 pack : ( { width : Float, height : Float }, a ) -> BinPack a -> Maybe (BinPack a)
-pack ( rect, value ) model =
-    case model of
+pack ( rect, value ) bp =
+    case bp of
         Free f ->
             if rect.width <= f.width && rect.height <= f.height
             then
@@ -148,11 +253,13 @@ pack ( rect, value ) model =
                         Nothing -> Nothing
 
 
-pack1 : ( { width : Float, height : Float }, a ) -> BinPack a -> BinPack a
-pack1 ( rect, value ) model =
-    pack ( rect, value ) model |> Maybe.withDefault model
+{-| Try to pack the value in a rectangle with given width and height. If the rectangle doesn't fit, ignore that fact and return previous condition of `BinPack`. -}
+carelessPack : ( { width : Float, height : Float }, a ) -> BinPack a -> BinPack a
+carelessPack ( rect, value ) bp =
+    pack ( rect, value ) bp |> Maybe.withDefault bp
 
 
+{-| Try to find a value in a structure using given coordinates. -}
 find : { x : Float, y : Float } -> BinPack a -> Maybe ( a, Bounds )
 find pos =
     unfold
