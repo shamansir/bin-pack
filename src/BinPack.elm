@@ -2,10 +2,10 @@ module BinPack exposing
 
     ( BinPack
     , container
-    , pack, forcePack
+    , pack, carelessPack, packAll
     , find
     , fold, foldGeometry
-    , toList, fromList
+    , toList
     , map
     )
 
@@ -45,7 +45,7 @@ Usually you don't need creating nodes manually, prefer creating an empty contain
 
 # Packing
 
-@docs pack, forcePack
+@docs pack, carelessPack, packAll
 
 # Search
 
@@ -209,6 +209,12 @@ toList1 : BinPack a -> List (BinPack a, Bounds)
 toList1 = foldGeometry1 (::) []
 
 
+{-| Try to pack all the values with given dimensions in a `BinPack` container with given width and height, ignore the item when it doesn't fit.
+-}
+packAll : Float -> Float -> List ( { width : Float, height : Float }, a ) -> BinPack a
+packAll w h = List.foldl carelessPack <| container w h
+
+
 {-| Create an empty container with given height and width.
 -}
 container : Float -> Float -> BinPack a
@@ -262,7 +268,7 @@ carelessPack ( rect, value ) bp =
 {-| Try to find a value in a structure using given coordinates. -}
 find : { x : Float, y : Float } -> BinPack a -> Maybe ( a, Bounds )
 find pos =
-    unfold
+    foldGeometry
         (\ ( v, bounds ) foundBefore ->
             case foundBefore of
                 Just _ -> foundBefore
