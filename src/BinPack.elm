@@ -1,6 +1,6 @@
 module BinPack exposing
 
-    ( BinPack
+    ( BinPack, Bounds
     , container
     , pack, carelessPack, packAll
     , find
