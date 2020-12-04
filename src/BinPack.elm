@@ -17,7 +17,7 @@ Based on [the version in Haskell](https://github.com/bflyblue/binpack/blob/maste
 
 [The article on how it works](https://codeincomplete.com/articles/bin-packing/).
 
-Create one with `container <width> <height>` and then add rectangles and values using `pack` or `forcePack`:
+Create one with `container <width> <height>` and then add rectangles and values using `pack` or `carelessPack`:
 
     -- :: BinPack Color
     BinPack.container 300 250
@@ -37,9 +37,11 @@ Create one with `container <width> <height>` and then add rectangles and values 
 
 @docs BinPack
 
-# Create container or node
+# Bounds
 
-Usually you don't need creating nodes manually, prefer creating an empty container and filling it with cells using `pack`.
+@docs Bounds
+
+# Create container
 
 @docs container
 
@@ -65,7 +67,14 @@ Usually you don't need creating nodes manually, prefer creating an empty contain
 
 -}
 
-import Bounds exposing (Bounds)
+
+{-| The bounds, top left corner and width/height. -}
+type alias Bounds =
+    { x : Float
+    , y : Float
+    , width : Float
+    , height : Float
+    }
 
 
 {-| `BinPack a`, where `a` is the type of what every rectangle is associated with (what lies in every cell). For example, it could be `Color`.
@@ -145,14 +154,14 @@ fold1 f i bp =
         |> pack ( { width = 20, height = 15 }, Color.red )
         |> pack ( { width = 5, height = 25 }, Color.blue )
         |> pack ( { width = 12, height = 25 }, Color.green )
-        |> foldByBounds (::) []
+        |> foldGeometry (::) []
 
-    ==
-        [ ( Color.black, { x = 0, y = 0, width = 10, height = 30 } )
-        , ( Color.red, { x = 0, y = 30, width = 20, height = 15 } )
-        , ( Color.blue, { x = 10, y = 0, width = 5, height = 25 } )
-        , ( Color.green, { x = 0, y = 45, width = 12, height = 25 } )
-        ]
+    -- ==
+    --    [ ( Color.black, { x = 0, y = 0, width = 10, height = 30 } )
+    --    , ( Color.red, { x = 0, y = 30, width = 20, height = 15 } )
+    --    , ( Color.blue, { x = 10, y = 0, width = 5, height = 25 } )
+    --    , ( Color.green, { x = 0, y = 45, width = 12, height = 25 } )
+    --    ]
  -}
 foldGeometry : ( ( a, Bounds ) -> k -> k ) -> k -> BinPack a -> k
 foldGeometry f =
