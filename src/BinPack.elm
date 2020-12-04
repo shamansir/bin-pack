@@ -41,7 +41,7 @@ Create one with `container <width> <height>` and then add rectangles and values 
 
 Usually you don't need creating nodes manually, prefer creating an empty container and filling it with cells using `pack`.
 
-@docs container, node
+@docs container
 
 # Packing
 
