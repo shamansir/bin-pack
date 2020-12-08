@@ -109,7 +109,7 @@ update msg model =
             | binPack =
                 rects
                     |> List.map rectToTuple
-                    |> List.foldl BinPack.pack1 model.binPack
+                    |> List.foldl BinPack.carelessPack model.binPack
             }
 
         , Cmd.none
@@ -120,7 +120,7 @@ update msg model =
             { model
             | binPack =
                 model.binPack
-                    |> BinPack.pack1 (rectToTuple rect)
+                    |> BinPack.carelessPack (rectToTuple rect)
             }
         , Cmd.none
         )
@@ -199,13 +199,13 @@ view model =
                 , S.stroke stroke
                 ]
                 []
-        viewItem (color, bounds)
+        viewItem ( color, bounds )
             = rect color bounds "black"
-        viewBP ( bp, bounds )
-            = case bp of
-                Node _ _ item ->
+        viewNode ( node, bounds )
+            = case node of
+                Just item ->
                     viewItem ( item, bounds )
-                Free _ ->
+                Nothing ->
                     rect "yellow" bounds "red"
     in
         div
@@ -214,11 +214,11 @@ view model =
                 OnlyRects ->
                     svg [ S.width "300", S.height "300" ]
                         <| List.map viewItem
-                        <| BinPack.unpack model.binPack
+                        <| BinPack.toList model.binPack
                 RectsAndFreeSpace ->
                     svg [ S.width "300", S.height "300" ]
-                        <| List.map viewBP
-                        <| BinPack.unpack1 model.binPack
+                        <| List.map viewNode
+                        <| BinPack.toListWithFreeSpace model.binPack
             , div
                 []
                 [ input

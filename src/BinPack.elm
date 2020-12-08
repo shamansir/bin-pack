@@ -4,8 +4,8 @@ module BinPack exposing
     , container
     , pack, carelessPack, packAll
     , find
-    , fold, foldGeometry
-    , toList
+    , fold, foldWithFreeSpace, foldGeometry, foldGeometryWithFreeSpace
+    , toList, toListWithFreeSpace
     , map
     )
 
@@ -21,17 +21,33 @@ Create one with `container <width> <height>` and then add rectangles and values 
 
     -- :: BinPack Color
     BinPack.container 300 250
-        |> pack ( { width = 10, height = 30 }, Color.black )
-        |> pack ( { width = 20, height = 15 }, Color.red )
-        |> pack ( { width = 5, height = 25 }, Color.blue )
+        |> BinPack.carelessPack ( { width = 10, height = 30 }, Color.black )
+        |> BinPack.carelessPack ( { width = 20, height = 15 }, Color.red )
+        |> BinPack.carelessPack ( { width = 5, height = 25 }, Color.blue )
         |> ...
 
     -- :: BinPack String
     BinPack.container 300 250
-        |> pack ( { width = 10, height = 30 }, "Martha" )
-        |> pack ( { width = 20, height = 15 }, "Ben" )
-        |> pack ( { width = 5, height = 25 }, "John" )
+        |> BinPack.carelessPack ( { width = 10, height = 30 }, "Martha" )
+        |> BinPack.carelessPack ( { width = 20, height = 15 }, "Ben" )
+        |> BinPack.carelessPack ( { width = 5, height = 25 }, "John" )
         |> ...
+
+    -- :: BinPack Color
+    BinPack.container 300 250
+        |> BinPack.packAll
+            [ ( { width = 10, height = 30 }, Color.black )
+            , ( { width = 20, height = 15 }, Color.red )
+            , ( { width = 5, height = 25 }, Color.blue )
+            ]
+
+    -- :: BinPack Color
+    BinPack.container 300 250
+        |> BinPack.pack ( { width = 10, height = 30 }, Color.black )
+        |> Maybe.andThen (BinPack.pack ( { width = 20, height = 15 }, Color.red ))
+        |> Maybe.andThen (BinPack.pack ( { width = 5, height = 25 }, Color.blue ))
+        |> ...
+        |> Maybe.withDefault (BinPack.container 300 250)
 
 # Core type
 
@@ -55,11 +71,11 @@ Create one with `container <width> <height>` and then add rectangles and values 
 
 # Folding
 
-@docs fold, foldGeometry
+@docs fold, foldWithFreeSpace, foldGeometry, foldGeometryWithFreeSpace
 
 # Lists
 
-@docs toList
+@docs toList, toListWithFreeSpace
 
 # Mapping
 
@@ -115,9 +131,9 @@ map f bp =
 {-| Fold the `BinPack a` to any other type, for example:
 
     BinPack.container 300 250
-        |> pack ( { width = 10, height = 30 }, Color.black )
-        |> pack ( { width = 20, height = 15 }, Color.red )
-        |> pack ( { width = 5, height = 25 }, Color.blue )
+        |> carelessPack ( { width = 10, height = 30 }, Color.black )
+        |> carelessPack ( { width = 20, height = 15 }, Color.red )
+        |> carelessPack ( { width = 5, height = 25 }, Color.blue )
         |> fold (::) []
 
     -- == [ Color.black, Color.red, Color.blue ]
@@ -125,35 +141,35 @@ map f bp =
  -}
 fold : ( a -> b -> b ) -> b -> BinPack a -> b
 fold f =
-    fold1
+    foldWithFreeSpace
         (\bp prev ->
             case bp of
-                Node _ _ v -> f v prev
-                Free _ -> prev
+                Just v -> f v prev
+                Nothing -> prev
         )
 
 
-{-| Fold the `BinPack` using the information about if it's a free space or a node.
+{-| Fold the `BinPack` using the information about if it's a free space (`Nothing`) or a node (`Maybe a`).
  -}
-fold1 : ( BinPack a -> b -> b ) -> b -> BinPack a -> b
-fold1 f i bp =
+foldWithFreeSpace : ( Maybe a -> b -> b ) -> b -> BinPack a -> b
+foldWithFreeSpace f i bp =
     case bp of
-        Node _ { right, below } _ ->
+        Node _ { right, below } v ->
             let
-                current = f bp i
-                fromRight = fold1 f current right
-                fromBelow = fold1 f fromRight below
+                current = f (Just v) i
+                fromRight = foldWithFreeSpace f current right
+                fromBelow = foldWithFreeSpace f fromRight below
             in fromBelow
-        Free _ -> f bp i
+        Free _ -> f Nothing i
 
 
 {-| Fold the structure, using both the values and their bounds:
 
     BinPack.container 20 100
-        |> pack ( { width = 10, height = 30 }, Color.black )
-        |> pack ( { width = 20, height = 15 }, Color.red )
-        |> pack ( { width = 5, height = 25 }, Color.blue )
-        |> pack ( { width = 12, height = 25 }, Color.green )
+        |> carelessPack ( { width = 10, height = 30 }, Color.black )
+        |> carelessPack ( { width = 20, height = 15 }, Color.red )
+        |> carelessPack ( { width = 5, height = 25 }, Color.blue )
+        |> carelessPack ( { width = 12, height = 25 }, Color.green )
         |> foldGeometry (::) []
 
     -- ==
@@ -180,15 +196,15 @@ foldGeometry f =
     in helper 0 0
 
 
-{-| Fold with the information if it's a free space or a node, including bounds.
+{-| Fold with the information if it's a free space (`Nothing`) or a node (`Just a`), including bounds.
  -}
-foldGeometry1 : ( ( BinPack a, Bounds ) -> k -> k ) -> k -> BinPack a -> k
-foldGeometry1 f =
+foldGeometryWithFreeSpace : ( ( Maybe a, Bounds ) -> k -> k ) -> k -> BinPack a -> k
+foldGeometryWithFreeSpace f =
     let
         helper x y v bp =
            case bp of
                Free r ->
-                    f ( bp,
+                    f ( Nothing,
                         { x = x, y = y
                         , width = r.width
                         , height = r.height
@@ -196,7 +212,7 @@ foldGeometry1 f =
                       )
                     v
                Node r n i ->
-                   f ( bp,
+                   f ( Just i,
                         { x = x, y = y
                         , width = r.width
                         , height = r.height
@@ -214,8 +230,8 @@ toList = foldGeometry (::) []
 
 {-| Convert the structure to the list of values and their bounds + information if it's a free space or a node.
 -}
-toList1 : BinPack a -> List (BinPack a, Bounds)
-toList1 = foldGeometry1 (::) []
+toListWithFreeSpace : BinPack a -> List (Maybe a, Bounds)
+toListWithFreeSpace = foldGeometryWithFreeSpace (::) []
 
 
 {-| Try to pack all the values with given dimensions in a `BinPack` container with given width and height, ignore the item when it doesn't fit.
@@ -242,6 +258,7 @@ node w h r b a =
         , below = b
         }
         a
+
 
 {-| Try to pack the value in a rectangle with given width and height. If the rect doesn't fit, `Nothing` is returned.
 -}
