@@ -2,7 +2,7 @@ module BinPack exposing
 
     ( BinPack, Bounds
     , container
-    , pack, carelessPack, packAll
+    , pack, carelessPack, packAll, packAllIn
     , find
     , fold, foldWithFreeSpace, foldGeometry, foldGeometryWithFreeSpace
     , toList, toListWithFreeSpace
@@ -35,7 +35,7 @@ Create one with `container <width> <height>` and then add rectangles and values 
 
     -- :: BinPack Color
     BinPack.container 300 250
-        |> BinPack.packAll
+        |> BinPack.packAllIn
             [ ( { width = 10, height = 30 }, Color.black )
             , ( { width = 20, height = 15 }, Color.red )
             , ( { width = 5, height = 25 }, Color.blue )
@@ -63,7 +63,7 @@ Create one with `container <width> <height>` and then add rectangles and values 
 
 # Packing
 
-@docs pack, carelessPack, packAll
+@docs pack, carelessPack, packAll, packAllIn
 
 # Search
 
@@ -237,7 +237,13 @@ toListWithFreeSpace = foldGeometryWithFreeSpace (::) []
 {-| Try to pack all the values with given dimensions in a `BinPack` container with given width and height, ignore the item when it doesn't fit.
 -}
 packAll : Float -> Float -> List ( { width : Float, height : Float }, a ) -> BinPack a
-packAll w h = List.foldl carelessPack <| container w h
+packAll w h list = packAllIn list <| container w h
+
+
+{-| Try to pack all the values with given dimensions in the given `BinPack` container.
+-}
+packAllIn : List ( { width : Float, height : Float }, a ) -> BinPack a -> BinPack a
+packAllIn list bp = List.foldl carelessPack bp list
 
 
 {-| Create an empty container with given height and width.
